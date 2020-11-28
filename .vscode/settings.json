@@ -1,0 +1,7 @@
+{
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.pylintArgs": ["--extension-pkg-whitelist=wx"],
+    "python.pythonPath": "/usr/bin/python3",
+    "python.formatting.provider": "black"
+}
