@@ -106,8 +106,8 @@ class GolWxPy(wx.Frame):
         self.rate = self.slider_rate.GetValue()
 
     def timer_callback(self, event):
+        # pylint: disable=unused-argument
         self.cellular_window.increment_time_step()
-        print("Timer callback at interval (ms): ", event.GetTimer().GetInterval())
 
     def on_play(self, event):
         # pylint: disable=unused-argument
@@ -131,8 +131,8 @@ class GolWxPy(wx.Frame):
     def on_rate(self, event):
         val = event.GetEventObject().GetValue()
         self.rate = val
-        # TODO should timer be started after dragging slider?
-        # self.timer.Start(self.rate)
+        if self.timer.IsRunning():
+            self.timer.Start(self.rate)
 
     def on_grid_size(self, event):
         val = event.GetEventObject().GetValue()

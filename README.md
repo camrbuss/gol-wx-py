@@ -4,3 +4,4 @@ Learning experience - Conway's Game of Life implemented in python3 with a wxPyth
 ## Python 3 Dependencies
 - wxPython (wx)
 - Numpy (numpy)
+- Scipy (scipy)
