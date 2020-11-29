@@ -8,6 +8,10 @@ class GolWxPy(wx.Frame):
     DEFAULT_WINDOW_HEIGHT = 800
     DEFAULT_WINDOW_WIDTH = 1200
 
+    BUTTON_HEIGHT = 50
+    BUTTON_WIDTH = 100
+    BUTTON_SIZE = wx.Size(BUTTON_WIDTH, BUTTON_HEIGHT)
+
     SLIDER_RATE_LABEL = "Tick Period (ms)"
     SLIDER_RATE_VALUE = 750
     SLIDER_RATE_MINVALUE = 20
@@ -17,6 +21,8 @@ class GolWxPy(wx.Frame):
     SLIDER_GRID_VALUE = 8
     SLIDER_GRID_MINVALUE = 8
     SLIDER_GRID_MAXVALUE = 128
+
+    is_auto_repeat = False
 
     def __init__(self, parent, title):
         wx.Frame.__init__(self, parent, title=title)
@@ -35,16 +41,19 @@ class GolWxPy(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_about, file_about)
         self.Bind(wx.EVT_MENU, self.on_exit, file_exit)
 
-        self.top_bar_box_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        button_play = wx.Button(self, -1, "Play")
-        button_pause = wx.Button(self, -1, "Pause")
-        button_next = wx.Button(self, -1, "Next")
-        button_reset = wx.Button(self, -1, "Reset")
+        self.option_bar_box_sizer = wx.BoxSizer(wx.VERTICAL)
+        button_play = wx.Button(self, -1, "Play", size=self.BUTTON_SIZE)
+        button_pause = wx.Button(self, -1, "Pause", size=self.BUTTON_SIZE)
+        button_next = wx.Button(self, -1, "Next", size=self.BUTTON_SIZE)
+        button_reset = wx.Button(self, -1, "Reset", size=self.BUTTON_SIZE)
         self.button_grid_sizer = wx.GridSizer(2, 0, 0)
         self.button_grid_sizer.AddMany(
             [button_play, button_pause, button_next, button_reset]
         )
-        self.top_bar_box_sizer.Add(self.button_grid_sizer)
+        self.option_bar_box_sizer.Add(self.button_grid_sizer)
+
+        self.checkbox_auto_repeat = wx.CheckBox(self, label="Auto Reset")
+        self.option_bar_box_sizer.Add(self.checkbox_auto_repeat, 1, wx.EXPAND)
 
         # Timer rate slider
         slider_rate_box = wx.StaticBox(self, label=self.SLIDER_RATE_LABEL)
@@ -57,9 +66,9 @@ class GolWxPy(wx.Frame):
             style=wx.SL_HORIZONTAL | wx.SL_LABELS,
         )
         slider_rate_box_sizer.Add(self.slider_rate, 1, wx.EXPAND)
-        self.top_bar_box_sizer.AddSpacer(5)
-        self.top_bar_box_sizer.Add(slider_rate_box_sizer, 1, wx.EXPAND)
-        self.top_bar_box_sizer.AddSpacer(5)
+        self.option_bar_box_sizer.AddSpacer(5)
+        self.option_bar_box_sizer.Add(slider_rate_box_sizer, 1, wx.EXPAND)
+        self.option_bar_box_sizer.AddSpacer(5)
 
         # Grid size slider
         slider_grid_box = wx.StaticBox(self, label=self.SLIDER_GRID_LABEL)
@@ -72,32 +81,33 @@ class GolWxPy(wx.Frame):
             style=wx.SL_HORIZONTAL | wx.SL_LABELS,
         )
         slider_grid_box_sizer.Add(self.slider_grid_size, 1, wx.EXPAND)
-        self.top_bar_box_sizer.AddSpacer(5)
-        self.top_bar_box_sizer.Add(slider_grid_box_sizer, 1, wx.EXPAND)
-        self.top_bar_box_sizer.AddSpacer(5)
+        self.option_bar_box_sizer.AddSpacer(5)
+        self.option_bar_box_sizer.Add(slider_grid_box_sizer, 1, wx.EXPAND)
+        self.option_bar_box_sizer.AddSpacer(5)
 
-        button_status = wx.Button(self, -1, "Status: None")
-        button_status.Disable()
-        self.top_bar_box_sizer.Add(button_status, 1, wx.EXPAND)
+        self.button_status = wx.Button(self, -1, label="Status: None")
+        self.button_status.Disable()
+        self.option_bar_box_sizer.Add(self.button_status, 1, wx.EXPAND)
 
         self.Bind(wx.EVT_BUTTON, self.on_play, button_play)
         self.Bind(wx.EVT_BUTTON, self.on_pause, button_pause)
         self.Bind(wx.EVT_BUTTON, self.on_next, button_next)
         self.Bind(wx.EVT_BUTTON, self.on_reset, button_reset)
-        # TODO add labels and units to sliders
+        self.Bind(wx.EVT_CHECKBOX, self.on_auto_repeat, self.checkbox_auto_repeat)
         self.slider_rate.Bind(wx.EVT_SLIDER, self.on_rate)
         self.slider_grid_size.Bind(wx.EVT_SLIDER, self.on_grid_size)
 
         self.cellular_window = CellularWindow(self, self.slider_grid_size.GetValue())
 
-        self.vertical_sizer = wx.BoxSizer(wx.VERTICAL)
-        # self.vertical_sizer.AddSpacer(5)
-        self.vertical_sizer.Add(self.top_bar_box_sizer, 0, wx.EXPAND)
-        self.vertical_sizer.Add(self.cellular_window, 1, wx.EXPAND, 0)
+        self.drawing_option_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.drawing_option_sizer.AddSpacer(10)
+        self.drawing_option_sizer.Add(self.option_bar_box_sizer, 0, wx.EXPAND)
+        self.drawing_option_sizer.AddSpacer(10)
+        self.drawing_option_sizer.Add(self.cellular_window, 1, wx.EXPAND, 0)
 
-        self.SetSizer(self.vertical_sizer)
+        self.SetSizer(self.drawing_option_sizer)
         self.SetAutoLayout(True)
-        self.vertical_sizer.Fit(self)
+        self.drawing_option_sizer.Fit(self)
         self.SetSize(self.DEFAULT_WINDOW_WIDTH, self.DEFAULT_WINDOW_HEIGHT)
         self.Show(True)
 
@@ -126,7 +136,9 @@ class GolWxPy(wx.Frame):
         # pylint: disable=unused-argument
         self.timer.Stop()
         self.cellular_window.randomly_populate_grid()
-        self.cellular_window.build_squares()
+
+    def on_auto_repeat(self, event):
+        self.is_auto_repeat = event.GetEventObject().GetValue()
 
     def on_rate(self, event):
         val = event.GetEventObject().GetValue()

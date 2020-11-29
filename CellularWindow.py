@@ -2,6 +2,7 @@ import math
 import wx
 import numpy as np
 from scipy import signal
+from collections import deque
 
 # TODO Reduce side effects and make methods more pure
 
@@ -12,7 +13,7 @@ class CellularWindow(wx.Window):
     _grid_line_list = []
     _square_list = []
     _current_state = None
-    _next_state = None
+    _state_hashes = deque([], maxlen=3)
 
     def __init__(self, parent, grid_size, *args, **kwargs):
         wx.Window.__init__(self, parent, *args, **kwargs)
@@ -61,29 +62,45 @@ class CellularWindow(wx.Window):
 
     def increment_time_step(self):
         self._current_state = CellularWindow.update_grid(self._current_state)
-        self.build_squares()
+        self._state_hashes.append(hash(self._current_state.tobytes()))
+        self.build_squares(self._current_state)
+        if self._state_hashes.__len__() == self._state_hashes.maxlen:
+            if (
+                self._state_hashes[0] == self._state_hashes[2]
+                or self._state_hashes[0] == self._state_hashes[1]
+            ):
+                self.GetParent().button_status.SetLabel("Iterations Stagnant")
+                if self.GetParent().is_auto_repeat:
+                    self.randomly_populate_grid()
+                else:
+                    self.GetParent().timer.Stop()
+
+        else:
+            self.GetParent().button_status.SetLabel("Iterations Progressing")
 
     def randomly_populate_grid(self):
         self._current_state = np.random.randint(
             0, high=2, size=(self._grid_size, self._grid_size), dtype=bool
         )
+        self.build_squares(self._current_state)
+        self._state_hashes.clear()
 
     def adjust_grid_size(self, length):
         self._grid_size = length
         self.randomly_populate_grid()
         self.SendSizeEvent()
 
-    def build_squares(self):
+    def build_squares(self, arr):
         self._square_list.clear()
         grid_spacing = self.get_grid_spacing()
-        for i in range(0, self._grid_size):
-            for j in range(0, self._grid_size):
-                if self._current_state[i, j]:
-                    x = i * grid_spacing
-                    y = j * grid_spacing
-                    w = grid_spacing
-                    h = grid_spacing
-                    self._square_list.append((x, y, w, h))
+        for i in range(0, arr.shape[0]):
+            for j in range(0, arr.shape[1]):
+                if arr[i, j]:
+                    x_loc = i * grid_spacing
+                    y_loc = j * grid_spacing
+                    width = grid_spacing
+                    height = grid_spacing
+                    self._square_list.append((x_loc, y_loc, width, height))
         self.Refresh()
 
     def build_grid_lines(self, event):
@@ -105,17 +122,13 @@ class CellularWindow(wx.Window):
             y_2 = y_1
             self._grid_line_list.append((x_1, y_1, x_2, y_2))
 
-        self.build_squares()
+        self.build_squares(self._current_state)
 
     def get_grid_spacing(self):
         self.GetSize()
         min_pixels = min(self.GetSize())
         grid_spacing = math.floor(min_pixels / self._grid_size)
         return grid_spacing
-
-    def zero_grid(self):
-        self._current_state = np.zeros((self._grid_size, self._grid_size), dtype=bool)
-        self._next_state = np.zeros((self._grid_size, self._grid_size), dtype=bool)
 
     def on_paint(self, event):
         device_context = wx.PaintDC(self)
