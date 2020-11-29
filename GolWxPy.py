@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from datetime import datetime
 import wx
 from CellularWindow import CellularWindow
 
@@ -6,7 +7,7 @@ from CellularWindow import CellularWindow
 class GolWxPy(wx.Frame):
 
     DEFAULT_WINDOW_HEIGHT = 800
-    DEFAULT_WINDOW_WIDTH = 1200
+    DEFAULT_WINDOW_WIDTH = 1000
 
     BUTTON_HEIGHT = 50
     BUTTON_WIDTH = 100
@@ -23,6 +24,7 @@ class GolWxPy(wx.Frame):
     SLIDER_GRID_MAXVALUE = 128
 
     is_auto_repeat = False
+    is_save_images = False
 
     def __init__(self, parent, title):
         wx.Frame.__init__(self, parent, title=title)
@@ -42,6 +44,7 @@ class GolWxPy(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_exit, file_exit)
 
         self.option_bar_box_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.option_bar_box_sizer.AddSpacer(5)
         button_play = wx.Button(self, -1, "Play", size=self.BUTTON_SIZE)
         button_pause = wx.Button(self, -1, "Pause", size=self.BUTTON_SIZE)
         button_next = wx.Button(self, -1, "Next", size=self.BUTTON_SIZE)
@@ -51,9 +54,10 @@ class GolWxPy(wx.Frame):
             [button_play, button_pause, button_next, button_reset]
         )
         self.option_bar_box_sizer.Add(self.button_grid_sizer)
-
         self.checkbox_auto_repeat = wx.CheckBox(self, label="Auto Reset")
         self.option_bar_box_sizer.Add(self.checkbox_auto_repeat, 1, wx.EXPAND)
+        self.checkbox_save_images = wx.CheckBox(self, label="Save Images")
+        self.option_bar_box_sizer.Add(self.checkbox_save_images, 1, wx.EXPAND)
 
         # Timer rate slider
         slider_rate_box = wx.StaticBox(self, label=self.SLIDER_RATE_LABEL)
@@ -88,12 +92,15 @@ class GolWxPy(wx.Frame):
         self.button_status = wx.Button(self, -1, label="Status: None")
         self.button_status.Disable()
         self.option_bar_box_sizer.Add(self.button_status, 1, wx.EXPAND)
+        self.option_bar_box_sizer.AddSpacer(5)
+
 
         self.Bind(wx.EVT_BUTTON, self.on_play, button_play)
         self.Bind(wx.EVT_BUTTON, self.on_pause, button_pause)
         self.Bind(wx.EVT_BUTTON, self.on_next, button_next)
         self.Bind(wx.EVT_BUTTON, self.on_reset, button_reset)
         self.Bind(wx.EVT_CHECKBOX, self.on_auto_repeat, self.checkbox_auto_repeat)
+        self.Bind(wx.EVT_CHECKBOX, self.on_save_images, self.checkbox_save_images)
         self.slider_rate.Bind(wx.EVT_SLIDER, self.on_rate)
         self.slider_grid_size.Bind(wx.EVT_SLIDER, self.on_grid_size)
 
@@ -118,6 +125,19 @@ class GolWxPy(wx.Frame):
     def timer_callback(self, event):
         # pylint: disable=unused-argument
         self.cellular_window.increment_time_step()
+        if self.is_save_images:
+
+            screen = wx.ClientDC(self)
+            size = screen.GetSize()
+            width = size[0]
+            height = size[1]
+            bmp = wx.Bitmap(width, height)
+            mem = wx.MemoryDC(bmp)
+            mem.Blit(0, 0, width, height, screen, 0, 0)
+            bmp.SaveFile(
+                datetime.utcnow().strftime("%Y%m%d%H%M%S%f")[:-3] + ".png",
+                wx.BITMAP_TYPE_PNG,
+            )
 
     def on_play(self, event):
         # pylint: disable=unused-argument
@@ -139,6 +159,9 @@ class GolWxPy(wx.Frame):
 
     def on_auto_repeat(self, event):
         self.is_auto_repeat = event.GetEventObject().GetValue()
+
+    def on_save_images(self, event):
+        self.is_save_images = event.GetEventObject().GetValue()
 
     def on_rate(self, event):
         val = event.GetEventObject().GetValue()
